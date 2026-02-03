@@ -108,54 +108,80 @@ data$age_group <- factor(
 data$age_group_code <- as.integer(data$age_group)   #numeric age group codes
 
 #=========================================
-# weighted average task measure for the different age groups for each year
+# weighted average task intensity for the different age groups for each year
 
-task_long <- data %>%
-  pivot_longer(
-    cols = c(knowledge_share, experience_share),
-    names_to = "task_category",
-    values_to = "task_share"
-  )
-
-task_weighted_means <- task_long %>%
-  group_by(year, age_group, task_category) %>%
+age_desc <- data %>%
+  group_by(year, age_group) %>%
   summarise(
-    weighted_task_share = weighted.mean(task_share, weight, na.rm = TRUE),
-    n = n(),
+    cognitive   = weighted.mean(cognitive_PCA, weight, na.rm = TRUE),
+    interactive = weighted.mean(interactive_PCA, weight, na.rm = TRUE),
+    physical    = weighted.mean(physical_PCA, weight, na.rm = TRUE),
+    n_unw = n(),
+    n_w   = sum(weight, na.rm = TRUE),
     .groups = "drop"
   )
+# Plotting
+ggplot(age_desc, aes(x = year, y = cognitive, color = age_group)) +
+  geom_line(size = 1.2) +
+  geom_point() +
+  labs(
+    title = "Cognitive task intensity by age group",
+    y = "Cognitive task index (0–1)",
+    x = "Survey wave"
+  ) +
+  theme_minimal()
+
+ggplot(age_desc, aes(x = year, y = interactive, color = age_group)) +
+  geom_line(size = 1.2) +
+  geom_point() +
+  labs(
+    title = "interactive task intensity by age group",
+    y = "interactive task index (0–1)",
+    x = "Survey wave"
+  ) +
+  theme_minimal()
+
+ggplot(age_desc, aes(x = year, y = physical, color = age_group)) +
+  geom_line(size = 1.2) +
+  geom_point() +
+  labs(
+    title = "physical task intensity by age group",
+    y = "physical task index (0–1)",
+    x = "Survey wave"
+  ) +
+  theme_minimal()
 
 # All ages
-task_weighted_all_ages <- task_long %>%
-  group_by(year, task_category) %>%
+overall_desc <- data %>%
+  group_by(year) %>%
   summarise(
-    weighted_task_share = weighted.mean(task_share, weight, na.rm = TRUE),
-    n = n(),
+    cognitive_all   = weighted.mean(cognitive_PCA, weight, na.rm = TRUE),
+    interactive_all = weighted.mean(interactive_PCA, weight, na.rm = TRUE),
+    physical_all   = weighted.mean(physical_PCA, weight, na.rm = TRUE),
+    n_unw = n(),
+    n_w   = sum(weight, na.rm = TRUE),
     .groups = "drop"
   )
+
+# Plotting
+overall_long <- overall_desc %>%
+  pivot_longer(
+    cols = c(cognitive_all, interactive_all, physical_all),
+    names_to = "task",
+    values_to = "value"
+  )
+
+ggplot(overall_long, aes(x = year, y = value, color = task)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  coord_cartesian(ylim = c(0.42, 0.72)) +
+  labs(
+    title = "Overall task intensity trends (all ages)",
+    x = "Survey year",
+    y = "Task intensity",
+    color = "Task type"
+  ) +
+  theme_minimal()
 
 #=========================================
-# Computing task growth rates
 
-# Weighted mean task share by year x age group x task category
-task_age_year <- task_long %>%
-  group_by(year, age_group, task_category) %>%
-  summarise(
-    T_bar = weighted.mean(task_share, weight, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Extracting the 1997 baseline (T_bar,1997)
-base_1997 <- task_age_year %>%
-  filter(year == 1997) %>%
-  select(age_group, task_category, T_bar_1997 = T_bar)
-
-# Computing TGR relative to 1997 
-task_TGR <- task_age_year %>%
-  left_join(base_1997, by = c("age_group", "task_category")) %>%
-  mutate(
-    TGR_pct = ((T_bar - T_bar_1997) / T_bar_1997) * 100
-  ) %>%
-  arrange(task_category, age_group, year)
-
-task_TGR
